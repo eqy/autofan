@@ -1,0 +1,53 @@
+xmlNode* curr = xmlDocGetRootElement(index_xml_doc);
+        if(strcmp((const char*) curr->name, HTML) == 0)
+        {
+            std::cerr <<"reached html node..." << std::endl;
+            curr = curr->children;
+        }
+        while(strcmp((const char*)curr->name,BODY) && curr != NULL)
+        {
+            if(curr->next != NULL)
+                curr = curr->next;
+        }
+        curr = curr->children;
+        curr = curr->next;
+        curr = curr->children;
+        while(strcmp((const char*)curr->name,TABLE) && curr != NULL)        
+        {
+            if(curr->next != NULL)
+                curr = curr->next;
+        }
+        curr = curr->children;
+        curr = curr->next;
+        curr = curr->children;
+        curr = curr->next;
+        curr = curr->next;
+        curr = curr->next;
+        curr = curr->children;
+        curr = curr->next;
+        curr = curr->children;
+        curr = curr->next;
+        curr = curr->next;
+        curr = curr->next; 
+        curr = curr->children;
+        curr = curr->next;
+        curr = curr->children;
+        while(strcmp((const char*)curr->name,TABLE) && curr != NULL)        
+        {
+            if(curr->next != NULL)
+                curr = curr->next;
+        }
+        curr = curr->next;
+        curr = curr->next;
+        curr = curr->children;
+        int i = 0;
+        while (curr != NULL)
+        {
+            std::cerr << i << std::endl;
+            std::cerr << curr->name <<std::endl;
+            char * stuff = (char *) xmlNodeGetContent(curr);
+            std::cerr << stuff << std::endl;
+            curr = curr->next;
+            i++;
+        }
+

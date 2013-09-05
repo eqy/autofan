@@ -1,0 +1,5 @@
+autofan:
+A tool to automatically track fan club members on teamliquid.net.
+
+USAGE:
+./autofan.o [TOPIC-ID] > textfile.txt
