@@ -1,6 +1,7 @@
 #ifndef TLTOPIC_H
 #define TLTOPIC_H
 #include <string>
+#include <sstream>
 #include <curl/curl.h>
 #include <tidy/tidy.h>
 #include <tidy/buffio.h>
