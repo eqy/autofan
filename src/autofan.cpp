@@ -1,13 +1,15 @@
 #include "autofan.h"
 
 const boost::regex autofan::rules[] = 
-{ boost::regex("add\\s?me", boost::regex::perl | boost::regex::icase),
-  boost::regex("sign\\s?me", boost::regex::perl | boost::regex::icase),
-  boost::regex("count\\s?me\\s?in", boost::regex::perl | boost::regex::icase),
-  boost::regex("I'll\\s?join", boost::regex::perl | boost::regex::icase)
+{ boost::regex("\\s?add\\s?me", boost::regex::perl | boost::regex::icase),
+  boost::regex("\\s?sign\\s?me", boost::regex::perl | boost::regex::icase),
+  boost::regex("\\s?count\\s?me\\s?in", boost::regex::perl | boost::regex::icase),
+  boost::regex("\\s?I'll\\s?join", boost::regex::perl | boost::regex::icase),
+  boost::regex("\\s?go?", boost::regex::perl | boost::regex::icase),
+  boost::regex("\\s?me\\s?up", boost::regex::perl | boost::regex::icase)
 };
 
-const unsigned int autofan::n_rules = 4;
+const unsigned int autofan::n_rules = 6;
 
 //We don't want to create the object like this, currently unsupported
 autofan::autofan(void)
