@@ -177,8 +177,7 @@ tltopic::parse_status_t tltopic::parse_page(void)
    
     xmlDocPtr current_xml_doc = NULL;
     //Let's try to make it work even if the page isn't very clean
-    current_xml_doc = htmlReadMemory((const char *)output.bp,\
-strlen(output_xml),  url.c_str(), NULL, HTML_PARSE_RECOVER);    
+    current_xml_doc = xmlParseMemory((const char *)output.bp,strlen(output_xml));    
     if(current_xml_doc != NULL)    
     {
         xmlNodePtr root_ptr  = xmlDocGetRootElement(current_xml_doc);
