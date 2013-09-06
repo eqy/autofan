@@ -7,6 +7,8 @@
 #include <tidy/buffio.h>
 #include <libxml/tree.h>
 #include <libxml/parser.h>
+#include <libxml/xpath.h>
+//#include <libxml/xpathInternals.h>
 #include <libxml/HTMLparser.h>
 #include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>

@@ -45,6 +45,9 @@ void autofan::get_fans(void)
         std::cerr << posts[i].u_name << std::endl;
         std::cerr << posts[i].content << std::endl;
     }
-    delete [] posts;
+    if (posts != NULL)
+    {
+        delete [] posts;
+    }
     delete fanclub;
 }

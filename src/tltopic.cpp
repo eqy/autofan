@@ -67,7 +67,14 @@ void tltopic::fetch_pages(void)
     current_page.reserve(SOFT_PAGE_SIZE);
     download_page(url);
     
-    parse_page();   
+    parse_status_t parse_status = parse_page(); 
+    if (parse_status == BAD)
+    {
+        std::cerr << "returned" << std::endl;
+        std::cerr << post_count << std::endl;
+        std::cerr << head       << std::endl;
+        return;
+    }
     int i = 2;
     std::stringstream page_url;
     while (true)
@@ -76,7 +83,7 @@ void tltopic::fetch_pages(void)
         page_url.str("");
         page_url << url.c_str() << SUFFIX << i;
         download_page(page_url.str());
-        parse_status_t parse_status = parse_page();
+        parse_status = parse_page();
         if (parse_status == BAD)
         break;
         else
@@ -120,9 +127,12 @@ tltopic::post* tltopic::get_posts(void)
     tltopic::post* posts_copy = new post[post_count];
     tltopic::post* curr       = head;
     unsigned int i = 0;
-    posts_copy[i].u_name = std::string(curr->u_name);
-    posts_copy[i].content = std::string(curr->content);
-    curr = curr->next;
+    if (curr != NULL)
+    {
+        posts_copy[i].u_name = std::string(curr->u_name);
+        posts_copy[i].content = std::string(curr->content);
+        curr = curr->next;
+    }
     while (curr != NULL)
     {
         i++;
@@ -178,6 +188,36 @@ tltopic::parse_status_t tltopic::parse_page(void)
     xmlDocPtr current_xml_doc = NULL;
     //Let's try to make it work even if the page isn't very clean
     current_xml_doc = xmlParseMemory((const char *)output.bp,strlen(output_xml));    
+    xmlXPathContextPtr xmlpath_ctx;
+    xmlpath_ctx = xmlXPathNewContext(current_xml_doc);
+    if(xmlpath_ctx != NULL)
+    {
+        xmlChar * post_key = (xmlChar *) "//div[@class='quote']";
+        std::cerr << "created xmlpath context" << std::endl;
+        xmlXPathObjectPtr xmlpath_obj = xmlXPathEvalExpression(post_key, xmlpath_ctx);
+        int k = 0;
+        std::cerr << xmlpath_obj->nodesetval->nodeNr << std::endl;
+        for (k=0; k < xmlpath_obj->nodesetval->nodeNr; k++)
+        {
+            
+            char * xmlNodeTempContent = (char*) xmlNodeGetContent(xmlpath_obj->nodesetval->nodeTab[k]);
+            std::cerr << xmlNodeTempContent << std::endl;
+            xmlFree(xmlNodeTempContent);
+        }
+        if(xmlpath_obj != NULL)
+        {
+            std::cerr << "created xmlpath object pointer" << std::endl;
+            xmlXPathFreeObject(xmlpath_obj);
+        }
+    xmlXPathFreeContext(xmlpath_ctx);
+    }
+
+    tidyRelease(tidy_instance);
+    tidyBufFree(&output);
+    tidyBufFree(&errbuf);
+
+    xmlFreeDoc(current_xml_doc);
+    /*    
     if(current_xml_doc != NULL)    
     {
         xmlNodePtr root_ptr  = xmlDocGetRootElement(current_xml_doc);
@@ -208,7 +248,8 @@ tltopic::parse_status_t tltopic::parse_page(void)
     tidyBufFree(&output);
     tidyBufFree(&errbuf);
     xmlFreeDoc(current_xml_doc);
-    return GOOD;
+    return GOOD;*/
+    return BAD;
 }
 
 xmlNode* tltopic::find_juicy_table(const xmlNode* root_nodes)
@@ -370,7 +411,6 @@ std::string tltopic::scrape_u_name(const std::string post_header)
             {
                 u_name.append(1, current);
                 reached_text = true;
-            
             }
         }
         else
