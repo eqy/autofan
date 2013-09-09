@@ -30,6 +30,7 @@ tltopic::tltopic(void)
     id = "0";
     url = PREFIX;
     url.append(id);
+    kill_quotes = false;
     easy_handle = curl_easy_init();      
     head = NULL;
     tail = NULL;
@@ -44,6 +45,7 @@ tltopic::tltopic(std::string topic_id)
     id = topic_id;
     url = PREFIX;
     url.append(id);
+    kill_quotes = false;
     easy_handle = curl_easy_init();
     head = NULL;
     tail = NULL;
@@ -89,10 +91,11 @@ void tltopic::fetch_pages(void)
     if (parse_status == BAD)
     {
         std::cerr << "returned" << std::endl;
-        std::cerr << post_count << std::endl;
-        std::cerr << head       << std::endl;
+        //std::cerr << post_count << std::endl;
+        //std::cerr << head       << std::endl;
         return;
     }
+    
     int i = 2;
     std::stringstream page_url;
     while (true)
@@ -168,6 +171,11 @@ unsigned int tltopic::get_post_count(void)
     return post_count;
 }
 
+void tltopic::set_kill_quotes(bool choice)
+{
+    kill_quotes = choice;
+}
+
 tltopic::parse_status_t tltopic::parse_page(void)
 {
     TidyBuffer output;
@@ -207,20 +215,31 @@ tltopic::parse_status_t tltopic::parse_page(void)
     //Let's try to make it work even if the page isn't very clean
     xml_doc_instance = xmlParseMemory((const char *)output.bp,strlen(output_xml));    
     xml_xpathctx_instance = xmlXPathNewContext(xml_doc_instance);
+    
+    tidyRelease(tidy_instance);
+    tidyBufFree(&output);
+    tidyBufFree(&errbuf);
+
     if (xml_xpathctx_instance != NULL)
     {
         parse_status_t parse_post_status = parse_posts();
         if (parse_post_status == BAD)
         {
             std::cerr << "Post parsing for current page failed" << std::endl;
+            xmlFreeDoc(xml_doc_instance);
+            xmlXPathFreeContext(xml_xpathctx_instance);
+            return BAD;
+        }
+        else
+        {
+            return GOOD;
         }
     }
+    else
+    {
+            return BAD;
+    }
 
-    tidyRelease(tidy_instance);
-    tidyBufFree(&output);
-    tidyBufFree(&errbuf);
-
-    xmlFreeDoc(xml_doc_instance);
     /*    
     if(xml_doc_instance != NULL)    
     {
@@ -253,7 +272,7 @@ tltopic::parse_status_t tltopic::parse_page(void)
     tidyBufFree(&errbuf);
     xmlFreeDoc(xml_doc_instance);
     return GOOD;*/
-    return BAD;
+    //return BAD;
 }
 
 /*
@@ -304,6 +323,23 @@ void tltopic::extract_posts(const xmlNode* post_table)
 
 tltopic::parse_status_t tltopic::parse_posts(void)
 {
+    //If we want to ignore quotes
+    if (kill_quotes)
+    {
+       xmlXPathObjectPtr quote_object =xmlXPathEvalExpression((xmlChar *) QUOTE_XPATH, xml_xpathctx_instance); 
+       int n_quotes = quote_object->nodesetval->nodeNr;
+       int q;
+       for (q = n_quotes-1; q >= 0; q--)
+       {
+           xmlNodeSetContent(quote_object->nodesetval->nodeTab[q], (xmlChar *) "");           
+       }
+       if (quote_object != NULL)
+       {
+            xmlXPathFreeObject(quote_object);
+       }
+       
+    } 
+
     //Get the post headers
     xmlXPathObjectPtr header_object = xmlXPathEvalExpression((xmlChar *) POST_HEADER_XPATH, xml_xpathctx_instance);
     int n_headers = header_object->nodesetval->nodeNr; 
@@ -311,29 +347,67 @@ tltopic::parse_status_t tltopic::parse_posts(void)
     xmlXPathObjectPtr body_object   = xmlXPathEvalExpression((xmlChar *) POST_BODY_XPATH, xml_xpathctx_instance);
     int n_bodies  = body_object->nodesetval->nodeNr;
 
-    int i = 0;
-    for (i = 0; i < n_headers; i++)
+    //We have reached a nonexistent page in the topic
+    if (n_headers == 0 || n_bodies == 0)
     {
-        char * temp =  (char *) xmlNodeGetContent(header_object->nodesetval->nodeTab[i]);
-        std::cerr << temp << i << std::endl;
-        xmlFree(temp);
+        if (header_object != NULL)
+            xmlXPathFreeObject(header_object);
+        if (body_object != NULL)
+            xmlXPathFreeObject(body_object);
+        return BAD;
     }
-
-    
-    if (header_object != NULL)
-        xmlXPathFreeObject(header_object);
-    if (body_object != NULL)
-        xmlXPathFreeObject(body_object);
-
-    if (n_headers != n_bodies)
+    else if (n_headers != n_bodies)
     {
-        std::cerr << "FATAL: Number of headers does not muatch number of bodies" << std::endl;
-        std::cerr << n_headers << std::endl;
-        std::cerr << n_bodies << std::endl;
+        std::cerr << "FATAL: Header/Body counter mismatch" << std::endl;
+        std::cerr << "Header count: " << n_headers << std::endl;
+        std::cerr << "Body count: " << n_bodies << std::endl;
+        
+        if (header_object != NULL)
+            xmlXPathFreeObject(header_object);
+        if (body_object != NULL)
+            xmlXPathFreeObject(body_object);
+
         return BAD;
     }   
     else 
     {
+        int i;
+        //Make sure that the posts and headers are ordered properly
+        //The API says that the nodes are in no particular order, though
+        //experience suggests that this step not strictly necessary
+        xmlXPathNodeSetSort(header_object->nodesetval);
+        xmlXPathNodeSetSort(body_object->nodesetval);
+        for (i = 0; i < n_headers; i++)
+        {
+            char * temp_header_content = (char *) xmlNodeGetContent(header_object->nodesetval->nodeTab[i]);
+            char * temp_body_content   = (char *) xmlNodeGetContent(body_object->nodesetval->nodeTab[i]);
+            if (tail != NULL)
+            {
+                post* temp = tail;
+                tail = new post;
+                tail->u_name = scrape_u_name(std::string(temp_header_content));
+                tail->content = cleanup(std::string(temp_body_content));
+                tail->next = NULL;
+                temp->next = tail;
+            } 
+            else
+            { 
+                head = new post;
+                head->u_name =  scrape_u_name(std::string(temp_header_content));
+                head->content = cleanup(std::string(temp_body_content));
+                head->next = NULL;
+                tail = head;
+            }            
+            post_count++;
+            xmlFree(temp_header_content);
+            xmlFree(temp_body_content);
+        } 
+        
+        if (header_object != NULL)
+            xmlXPathFreeObject(header_object);
+        if (body_object != NULL)
+            xmlXPathFreeObject(body_object);
+
         return GOOD;   
     }
 }

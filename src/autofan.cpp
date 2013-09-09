@@ -25,29 +25,35 @@ autofan::autofan(std::string topic_id)
 void autofan::get_fans(void)
 {
     tltopic* fanclub = new tltopic(id);
+    fanclub->set_kill_quotes(true);
     fanclub->fetch_pages();
-    tltopic::post* posts = fanclub->get_posts();
+    
     unsigned int post_count = fanclub->get_post_count();
-    unsigned int i;
-    unsigned int j;
-    bool         is_fan;
-    for (i = 0; i < post_count; i++)
+    if (post_count > 0)
     {
-        is_fan = false;
-        for (j = 0; j < n_rules; j++)
+        tltopic::post* posts = fanclub->get_posts();
+        unsigned int i;
+        unsigned int j;
+        bool         is_fan;
+        for (i = 0; i < post_count; i++)
         {
-           
-           if (regex_search(posts[i].content, rules[j]) || i==0) 
-                is_fan = true;
-        }     
-        if (is_fan)
-            std::cout << posts[i].u_name << std::endl;
-        std::cerr << posts[i].u_name << std::endl;
-        std::cerr << posts[i].content << std::endl;
-    }
-    if (posts != NULL)
-    {
-        delete [] posts;
+            is_fan = false;
+            for (j = 0; j < n_rules; j++)
+            {
+               
+               if (regex_search(posts[i].content, rules[j]) || i==0) 
+                    is_fan = true;
+            }     
+            if (is_fan)
+                std::cout << posts[i].u_name << std::endl;
+            std::cerr << posts[i].u_name << std::endl;
+            std::cerr << posts[i].content << std::endl;
+            std::cerr << "================================================================================"<<std::endl;
+        }
+        if (posts != NULL)
+        {
+            delete [] posts;
+        }
     }
     delete fanclub;
 }

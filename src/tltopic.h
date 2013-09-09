@@ -8,7 +8,7 @@
 #include <libxml/tree.h>
 #include <libxml/parser.h>
 #include <libxml/xpath.h>
-//#include <libxml/xpathInternals.h>
+#include <libxml/xpathInternals.h>
 #include <libxml/HTMLparser.h>
 #include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
@@ -68,6 +68,7 @@ class tltopic
     parse_status_t  parse_page(void); 
     post*           get_posts(void);
     unsigned int    get_post_count(void);    
+    void            set_kill_quotes(bool choice);
  
     private:
     //void               extract_posts(const xmlNode* post_table);
@@ -81,6 +82,7 @@ class tltopic
     std::string         url;
     std::string         current_page;
     std::string         current_tidied;
+    bool                kill_quotes;
     CURL*               easy_handle; 
     TidyDoc             tidy_instance;
     xmlDocPtr           xml_doc_instance;
