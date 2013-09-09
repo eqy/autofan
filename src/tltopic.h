@@ -36,12 +36,14 @@ class tltopic
     
     static const std::string PREFIX;
     static const std::string SUFFIX;
-    static const boost::regex JUICY_KEY;
     static const boost::regex VALID_POST_HEADER;
     static const char * HTML;
     static const char * BODY;
     static const char * TABLE;
     static const char * TABLE_DATA;
+    static const char * POST_BODY_XPATH;
+    static const char * POST_HEADER_XPATH;
+    static const char * QUOTE_XPATH;
     static const char * TEXT;
     static const char   TAB;
     static const char   NEWLINE;
@@ -68,23 +70,23 @@ class tltopic
     unsigned int    get_post_count(void);    
  
     private:
-    static xmlNode*    find_juicy_table(const xmlNode* root_node); 
-    static bool        has_juicy_key(std::string input);
-    void               extract_posts(const xmlNode* post_table);
-    post*              parse_post(const xmlNode* post); 
+    //void               extract_posts(const xmlNode* post_table);
+    parse_status_t     parse_posts(void); 
     static bool        is_valid_post(const std::string post_header);
     static std::string scrape_u_name(const std::string post_header);
     static std::string cleanup(const std::string input);
     void               free_posts(void);
          
-    std::string     id; 
-    std::string     url;
-    std::string     current_page;
-    std::string     current_tidied;
-    CURL*           easy_handle; 
-    TidyDoc         tidy_instance;
-    post*           head;
-    post*           tail;
-    unsigned int    post_count;
+    std::string         id; 
+    std::string         url;
+    std::string         current_page;
+    std::string         current_tidied;
+    CURL*               easy_handle; 
+    TidyDoc             tidy_instance;
+    xmlDocPtr           xml_doc_instance;
+    xmlXPathContextPtr  xml_xpathctx_instance;
+    post*               head;
+    post*               tail;
+    unsigned int        post_count;
 };
 #endif

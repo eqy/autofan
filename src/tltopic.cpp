@@ -3,11 +3,23 @@
 
 const std::string tltopic::PREFIX = "http://www.teamliquid.net/forum/viewmessage.php?topic_id=";
 const std::string tltopic::SUFFIX = "&currentpage=";
-const boost::regex tltopic::JUICY_KEY("Gift.*TL+.*Please.*log.*in.*.or.*register.*to.*.*reply.");
 const boost::regex tltopic::VALID_POST_HEADER(".*Posts.*");
 const char * tltopic::HTML        = "html";
 const char * tltopic::BODY        = "body";
 const char * tltopic::TABLE       = "table";
+const char * tltopic::POST_BODY_XPATH = "//td[@class='forumPost']";
+//We have a choice here between keeping the code simple, or keeping it pretty.
+//This is because tidy does not like the use of span and div in the post header
+//in the original page source, so it inserts an empty span with the same
+//attribute (forummsginfo) as the offending span. This causes libxml2 to double
+//count post headers and leads to a mess. We avoid this by using an uglier
+//(table) XPath expression.
+//Should using the complicating XPath be necessary at some point, the fix would
+//be to discard any post headers that are empty as the tidy-generated spans are
+//empty.
+//const char * tltopic::POST_HEADER_XPATH = "//span[@class='forummsginfo']";
+const char * tltopic::POST_HEADER_XPATH = "//td[@valign='top'and @class='titelbalk']";
+const char * tltopic::QUOTE_XPATH = "//div[@class='quote']";
 //const char * tltopic::TABLE_DATA  = "TD";
 const char * tltopic::TEXT   = "text";
 const char tltopic::TAB    = '\t';
@@ -21,6 +33,9 @@ tltopic::tltopic(void)
     easy_handle = curl_easy_init();      
     head = NULL;
     tail = NULL;
+    tidy_instance = NULL;
+    xml_doc_instance = NULL;
+    xml_xpathctx_instance = NULL;
     post_count = 0;
 }
 
@@ -32,6 +47,9 @@ tltopic::tltopic(std::string topic_id)
     easy_handle = curl_easy_init();
     head = NULL;
     tail = NULL;
+    tidy_instance = NULL;
+    xml_doc_instance = NULL;
+    xml_xpathctx_instance = NULL;
     post_count = 0;
 }
 
@@ -160,7 +178,7 @@ tltopic::parse_status_t tltopic::parse_page(void)
     bool ok;
     int  status = -1;
     char * output_xml = NULL;
-    TidyDoc tidy_instance = tidyCreate();
+    tidy_instance = tidyCreate();
     //Protip: The options are not listed in the API documentation--so just read
     //the source!
     ok = tidyOptSetBool(tidy_instance, TidyXmlOut, yes);
@@ -185,42 +203,28 @@ tltopic::parse_status_t tltopic::parse_page(void)
     std::cerr << errbuf.bp << std::endl;
     current_tidied = output_xml; 
    
-    xmlDocPtr current_xml_doc = NULL;
+    xml_doc_instance = NULL;
     //Let's try to make it work even if the page isn't very clean
-    current_xml_doc = xmlParseMemory((const char *)output.bp,strlen(output_xml));    
-    xmlXPathContextPtr xmlpath_ctx;
-    xmlpath_ctx = xmlXPathNewContext(current_xml_doc);
-    if(xmlpath_ctx != NULL)
+    xml_doc_instance = xmlParseMemory((const char *)output.bp,strlen(output_xml));    
+    xml_xpathctx_instance = xmlXPathNewContext(xml_doc_instance);
+    if (xml_xpathctx_instance != NULL)
     {
-        xmlChar * post_key = (xmlChar *) "//div[@class='quote']";
-        std::cerr << "created xmlpath context" << std::endl;
-        xmlXPathObjectPtr xmlpath_obj = xmlXPathEvalExpression(post_key, xmlpath_ctx);
-        int k = 0;
-        std::cerr << xmlpath_obj->nodesetval->nodeNr << std::endl;
-        for (k=0; k < xmlpath_obj->nodesetval->nodeNr; k++)
+        parse_status_t parse_post_status = parse_posts();
+        if (parse_post_status == BAD)
         {
-            
-            char * xmlNodeTempContent = (char*) xmlNodeGetContent(xmlpath_obj->nodesetval->nodeTab[k]);
-            std::cerr << xmlNodeTempContent << std::endl;
-            xmlFree(xmlNodeTempContent);
+            std::cerr << "Post parsing for current page failed" << std::endl;
         }
-        if(xmlpath_obj != NULL)
-        {
-            std::cerr << "created xmlpath object pointer" << std::endl;
-            xmlXPathFreeObject(xmlpath_obj);
-        }
-    xmlXPathFreeContext(xmlpath_ctx);
     }
 
     tidyRelease(tidy_instance);
     tidyBufFree(&output);
     tidyBufFree(&errbuf);
 
-    xmlFreeDoc(current_xml_doc);
+    xmlFreeDoc(xml_doc_instance);
     /*    
-    if(current_xml_doc != NULL)    
+    if(xml_doc_instance != NULL)    
     {
-        xmlNodePtr root_ptr  = xmlDocGetRootElement(current_xml_doc);
+        xmlNodePtr root_ptr  = xmlDocGetRootElement(xml_doc_instance);
         xmlNodePtr table_ptr = find_juicy_table(root_ptr);
         //means that the current page was bad and there is no valid output
         if (table_ptr == root_ptr)
@@ -228,7 +232,7 @@ tltopic::parse_status_t tltopic::parse_page(void)
             tidyRelease(tidy_instance);
             tidyBufFree(&output);
             tidyBufFree(&errbuf);
-            xmlFreeDoc(current_xml_doc);
+            xmlFreeDoc(xml_doc_instance);
             return BAD;
         }
         else 
@@ -241,49 +245,18 @@ tltopic::parse_status_t tltopic::parse_page(void)
         tidyRelease(tidy_instance);
         tidyBufFree(&output);
         tidyBufFree(&errbuf);
-        xmlFreeDoc(current_xml_doc);
+        xmlFreeDoc(xml_doc_instance);
         return BAD;
     }
     tidyRelease(tidy_instance);
     tidyBufFree(&output);
     tidyBufFree(&errbuf);
-    xmlFreeDoc(current_xml_doc);
+    xmlFreeDoc(xml_doc_instance);
     return GOOD;*/
     return BAD;
 }
 
-xmlNode* tltopic::find_juicy_table(const xmlNode* root_nodes)
-{  
-   xmlNode* curr = (xmlNode *) root_nodes;
-   if (curr == NULL)
-   return curr;
-   
-   xmlNode* curr_child = curr;
-   while (curr_child != NULL)
-   {
-       char * temp_content = (char *) xmlNodeGetContent(curr_child);
-       if(has_juicy_key(std::string((char *) temp_content)))
-       {
-            std::cerr << "found juicy key in a child, moving down a layer" <<\
-            std::endl;
-            curr = curr_child;
-            curr_child = curr_child->children;
-       } 
-       else
-       {
-            std::cerr << "didn't find the juicy key in a child yet, going to the next child" << std::endl;
-            curr_child = curr_child->next;
-       }
-       xmlFree(temp_content);
-   }
-   return curr;
-}
-
-bool tltopic::has_juicy_key(std::string input)
-{
-    return regex_search(input, JUICY_KEY);     
-}
-
+/*
 //This method is likely the least robust to post-layout changes
 void tltopic::extract_posts(const xmlNode* post_table)
 {
@@ -327,66 +300,42 @@ void tltopic::extract_posts(const xmlNode* post_table)
         }
         curr = curr->next;
     }
-}
+}*/
 
-tltopic::post* tltopic::parse_post(const xmlNode* post_node)
+tltopic::parse_status_t tltopic::parse_posts(void)
 {
-    tltopic::post* new_post = new post();
-    xmlNode* curr_children = post_node->children;
-    while (curr_children != NULL)
+    //Get the post headers
+    xmlXPathObjectPtr header_object = xmlXPathEvalExpression((xmlChar *) POST_HEADER_XPATH, xml_xpathctx_instance);
+    int n_headers = header_object->nodesetval->nodeNr; 
+
+    xmlXPathObjectPtr body_object   = xmlXPathEvalExpression((xmlChar *) POST_BODY_XPATH, xml_xpathctx_instance);
+    int n_bodies  = body_object->nodesetval->nodeNr;
+
+    int i = 0;
+    for (i = 0; i < n_headers; i++)
     {
-        if (strcmp((char *)curr_children->name,TABLE) == 0)
-        {
-            xmlNode* temp = curr_children->children;
-            //subtext = 0 means we are reading the header of the post
-            //subtext = 1 means we are reading the content of the the post
-            //subtext = 2 means we are reading the signature of the post (if it
-            //exists)
-            int subtext = 0;
-            while (temp != NULL)
-            {
-                if (strcmp((char *)temp->name, TEXT))
-                {
-                    //See what we are dealing with
-                    char * temp_content = (char *) xmlNodeGetContent((xmlNode*) temp);
-                    //Move on if the header of the post is invalid and return a
-                    //NULL pointer
-                    if (subtext == 0 && !is_valid_post(std::string(temp_content)))
-                    {
-                        xmlFree(temp_content);
-                        delete new_post;
-                        new_post = NULL;
-                        break;
-                    }
-                    //We don't process the signature
-                    else if (subtext == 2)
-                    {
-                        xmlFree(temp_content);
-                        break;
-                    }
-                    //This corresponds to the header; We scrape the header.
-                    if (subtext == 0)
-                    {
-                        new_post->u_name = scrape_u_name(std::string(temp_content));
-                        //std::cerr << scrape_u_name(std::string(temp_content)) << std::endl;
-                    }
-                    //This corresponds to the content; We scrape the content.
-                    else
-                    {
-                        new_post->content = cleanup(std::string(temp_content));
-                        //std::cerr << cleanup(std::string(temp_content)) << std::endl;
-                    }
-                    xmlFree(temp_content);
-                    subtext++;
-                }
-                
-                temp = temp->next; 
-            } 
-                std::cerr << std::endl;
-        }
-                curr_children = curr_children->next;
+        char * temp =  (char *) xmlNodeGetContent(header_object->nodesetval->nodeTab[i]);
+        std::cerr << temp << i << std::endl;
+        xmlFree(temp);
     }
-    return new_post;   
+
+    
+    if (header_object != NULL)
+        xmlXPathFreeObject(header_object);
+    if (body_object != NULL)
+        xmlXPathFreeObject(body_object);
+
+    if (n_headers != n_bodies)
+    {
+        std::cerr << "FATAL: Number of headers does not muatch number of bodies" << std::endl;
+        std::cerr << n_headers << std::endl;
+        std::cerr << n_bodies << std::endl;
+        return BAD;
+    }   
+    else 
+    {
+        return GOOD;   
+    }
 }
 
 bool tltopic::is_valid_post(const std::string post_header)
