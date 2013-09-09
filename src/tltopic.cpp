@@ -231,12 +231,16 @@ tltopic::parse_status_t tltopic::parse_page(void)
             return BAD;
         }
         else
-        {
+        {  
+            xmlFreeDoc(xml_doc_instance);
+            xmlXPathFreeContext(xml_xpathctx_instance);
             return GOOD;
         }
     }
     else
     {
+            xmlFreeDoc(xml_doc_instance);
+            xmlXPathFreeContext(xml_xpathctx_instance);
             return BAD;
     }
 
