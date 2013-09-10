@@ -31,6 +31,7 @@ void autofan::get_fans(void)
     unsigned int post_count = fanclub->get_post_count();
     if (post_count > 0)
     {
+        std::map<std::string, unsigned int> * fan_map = new std::map<std::string, unsigned int>();
         tltopic::post* posts = fanclub->get_posts();
         unsigned int i;
         unsigned int j;
@@ -42,10 +43,16 @@ void autofan::get_fans(void)
             {
                
                if (regex_search(posts[i].content, rules[j]) || i==0) 
+               {
                     is_fan = true;
+               } 
+               
             }     
-            if (is_fan)
+            if (is_fan && fan_map->find(posts[i].u_name) == fan_map->end())
+            {
                 std::cout << posts[i].u_name << std::endl;
+                (*fan_map)[posts[i].u_name] = 0;                    
+            }
             std::cerr << posts[i].u_name << std::endl;
             std::cerr << posts[i].content << std::endl;
             std::cerr << "================================================================================"<<std::endl;
@@ -54,6 +61,7 @@ void autofan::get_fans(void)
         {
             delete [] posts;
         }
+        delete fan_map;
     }
     delete fanclub;
 }

@@ -2,6 +2,8 @@
 #define AUTOFAN_H
 #include "tltopic.h"
 #include <iostream>
+#include <map>
+
 class autofan
 {
     public:
