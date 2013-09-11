@@ -12,6 +12,7 @@ int main(int, char* argv[])
    //std::cout << fanclub->get_id() << std::endl;
    //std::cout << fanclub->get_url() << std::endl;
    myautofan->get_fans();
+   myautofan->update_db();
    //std::cout << fanclub->get_index_page() << std::endl;
    //fanclub->parse_index();
    //std::cout << fanclub->get_index_tidied() << std::endl;

@@ -18,7 +18,7 @@ const char * tltopic::POST_BODY_XPATH = "//td[@class='forumPost']";
 //be to discard any post headers that are empty as the tidy-generated spans are
 //empty.
 //const char * tltopic::POST_HEADER_XPATH = "//span[@class='forummsginfo']";
-const char * tltopic::POST_HEADER_XPATH = "//td[@valign='top'and @class='titelbalk']";
+const char * tltopic::POST_HEADER_XPATH = "//td[@valign='top'and (@class='titelbalk' or @class='titelhigh')]";
 const char * tltopic::QUOTE_XPATH = "//div[@class='quote']";
 //const char * tltopic::TABLE_DATA  = "TD";
 const char * tltopic::TEXT   = "text";
